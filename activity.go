@@ -18,7 +18,7 @@ import (
 
 var mapping_json = `{
 	"NO2": {
-		"field": "NO2"
+		"field": "NO2M"
 	},
 	"SO2": {
 		"field": "SO2"
@@ -235,6 +235,7 @@ func (a *Activity) Eval(ConnectorMsg map[string]interface{}) (done bool, err err
 		// Report with target timestamps
 		// Clear
 		// Do not report the one reading (just received) for this interval.
+		datetime = timestamps.TimestampToUTCZTimestring(a.TargetTimestamp)
 		a.setNextTargetTimestamp()
 		for _, v := range values {
 			sensor := v["field"].(string)
@@ -357,10 +358,13 @@ func (a *Activity) atTimeMark() bool {
 func New(ctx activity.InitContext) (Activity, error) {
 
 	s := &Settings{}
+	/* Debug */
 	s.OutputInterval = "4m"
 	s.InputInterval = 1
 	Mappings := map[string]interface{}{}
 	s.Mappings = mapping_json
+	/* Debug */
+
 	json.Unmarshal([]byte(s.Mappings), &Mappings)
 	sensors := make(map[string]string)
 	averagers := make(map[string][]float64)
