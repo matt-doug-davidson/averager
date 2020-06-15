@@ -378,6 +378,7 @@ func New(ctx activity.InitContext) (activity.Activity, error) { /* Standalone te
 		logger.Error("Failed to convert settings")
 		return nil, err
 	}
+	fmt.Println("s ", s)
 	/* Debug */
 	// s.OutputInterval = "1H"
 	// s.InputInterval = 10
@@ -385,15 +386,18 @@ func New(ctx activity.InitContext) (activity.Activity, error) { /* Standalone te
 	Mappings := map[string]interface{}{}
 	// s.Mappings = mapping_json
 	/* Debug */
-
+	fmt.Println("s.Mappings ", s.Mappings)
 	json.Unmarshal([]byte(s.Mappings), &Mappings)
+
 	sensors := make(map[string]string)
 	averagers := make(map[string][]float64)
 	fmt.Println(Mappings)
 	for i, v := range Mappings {
+		fmt.Println("i, v ", i, v)
 		vv := v.(map[string]interface{})
-
+		fmt.Println("vv ", vv)
 		f, found := vv["field"]
+		fmt.Println("f, found ", f, found)
 		if !found {
 			continue
 		}
