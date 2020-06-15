@@ -1,30 +1,28 @@
-package main
+package averager
 
 import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"math/rand"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/matt-doug-davidson/atif"
 	"github.com/matt-doug-davidson/timestamps"
 	"github.com/project-flogo/core/activity"
-	"github.com/project-flogo/core/support/test"
+	"github.com/project-flogo/core/data/metadata"
 )
 
-var mapping_json = `{
-	"NO2": {
-		"field": "NO2M"
-	},
-	"SO2": {
-		"field": "SO2"
-	}
-}
-`
+// var mapping_json = `{
+// 	"NO2": {
+// 		"field": "NO2M"
+// 	},
+// 	"SO2": {
+// 		"field": "SO2"
+// 	}
+// }
+// `
 
 type Activity struct {
 	settings          *Settings            // Defind in metadata.go in this package
@@ -48,7 +46,7 @@ func (a *Activity) Metadata() *activity.Metadata {
 // runs before any other in the package.
 func init() {
 	//_ = activity.Register(&Activity{})
-	//_ = activity.Register(&Activity{}, New) /* Stand alone test */
+	_ = activity.Register(&Activity{}, New) /* Stand alone test */
 }
 
 // Used when the init function is called. The settings, Input and Output
@@ -181,13 +179,22 @@ func setPercision(v float64, digits int) float64 {
 }
 
 // Eval evaluates the activity
-//func (a *Activity) Eval(ctx activity.Context) (done bool, err error) { /* Standalone Test */
-func (a *Activity) Eval(ConnectorMsg map[string]interface{}) (done bool, err error) {
-	//logger := ctx.Logger()
-	//logger.Info("scentroidsl50:Eval enter")
-	fmt.Println("\n\n\n+++++++++++++++++++++++++++Eval++++++++++++++++++++++++: \n", ConnectorMsg)
-	entity := ConnectorMsg["entity"].(string)
-	payload := ConnectorMsg["data"].(map[string]interface{})
+func (a *Activity) Eval(ctx activity.Context) (done bool, err error) { /* Standalone Test */
+	//func (a *Activity) Eval(ConnectorMsg map[string]interface{}) (done bool, err error) {
+	logger := ctx.Logger()
+	logger.Info("averager:Eval enter")
+
+	input := &Input{}
+	err = ctx.GetInputObject(input)
+	if err != nil {
+		logger.Error("Failed to input object")
+		return false, err
+	}
+	//fmt.Println(input.ConnectorMsg)
+	//fmt.Println(input.ConnectorMsg["entity"])
+	fmt.Println("\n\n\n+++++++++++++++++++++++++++Eval++++++++++++++++++++++++: \n", input.ConnectorMsg)
+	entity := input.ConnectorMsg["entity"].(string)
+	payload := input.ConnectorMsg["data"].(map[string]interface{})
 	fmt.Println("payload\n", payload)
 	//fmt.Println("datetime\n", payload["datetime"])
 	rcvdTs := timestamps.UTCZToUTCTimestamp(payload["datetime"].(string))
@@ -283,11 +290,11 @@ func (a *Activity) Eval(ConnectorMsg map[string]interface{}) (done bool, err err
 		// ConnectorMessage := make(map[string]interface{})
 		// ConnectorMessage["msg"] = connectorData
 
-		// err = ctx.SetOutput("connectorMsg", output)
-		// if err != nil {
-		// 	logger.Error("Failed to set output oject ", err.Error())
-		// 	return false, err
-		// }
+		err = ctx.SetOutput("connectorMsg", output)
+		if err != nil {
+			logger.Error("Failed to set output oject ", err.Error())
+			return false, err
+		}
 	}
 	fmt.Println("reportValues:\n", reportValues, "\n")
 	fmt.Println(a)
@@ -360,16 +367,23 @@ func (a *Activity) atTimeMark() bool {
 	return rc
 }
 
-//func New(ctx activity.InitContext) (activity.Activity, error) { /* Standalone test */
-func New(ctx activity.InitContext) (Activity, error) {
+func New(ctx activity.InitContext) (activity.Activity, error) { /* Standalone test */
+	//func New(ctx activity.InitContext) (Activity, error) {
 
+	logger := ctx.Logger()
+	logger.Info("averager:New enter")
 	s := &Settings{}
+	err := metadata.MapToStruct(ctx.Settings(), s, true)
+	if err != nil {
+		logger.Error("Failed to convert settings")
+		return nil, err
+	}
 	/* Debug */
-	s.OutputInterval = "1H"
-	s.InputInterval = 10
-	s.InputOffset = 2
+	// s.OutputInterval = "1H"
+	// s.InputInterval = 10
+	// s.InputOffset = 2
 	Mappings := map[string]interface{}{}
-	s.Mappings = mapping_json
+	// s.Mappings = mapping_json
 	/* Debug */
 
 	json.Unmarshal([]byte(s.Mappings), &Mappings)
@@ -418,7 +432,7 @@ func New(ctx activity.InitContext) (Activity, error) {
 	margins := timestamps.Nanoseconds(float64(s.InputInterval) / 2.0)
 	fmt.Println("margins: ", margins)
 
-	act := Activity{
+	act := &Activity{
 		/* act := Activity{ Standalone Test */
 		Sensors:           sensors,
 		Accumulators:      averagers,
@@ -438,95 +452,95 @@ func New(ctx activity.InitContext) (Activity, error) {
 	return act, nil
 }
 
-func main() {
-	fmt.Println("Starting")
+// func main() {
+// 	fmt.Println("Starting")
 
-	iCtx := test.NewActivityInitContext(nil, nil)
-	act, _ := New(iCtx)
+// 	iCtx := test.NewActivityInitContext(nil, nil)
+// 	act, _ := New(iCtx)
 
-	fmt.Println(act)
+// 	fmt.Println(act)
 
-	values := []map[string]interface{}{}
-	value := make(map[string]interface{})
-	value["field"] = "NO2"
-	value["amount"] = 5.0
-	values = append(values, value)
-	fmt.Println("****** ", values)
-	value1 := map[string]interface{}{}
-	value1["field"] = "SO2"
-	value1["amount"] = 6.7
-	fmt.Println("****** ", values)
-	values = append(values, value1)
-	fmt.Println("******** ", values)
+// 	values := []map[string]interface{}{}
+// 	value := make(map[string]interface{})
+// 	value["field"] = "NO2"
+// 	value["amount"] = 5.0
+// 	values = append(values, value)
+// 	fmt.Println("****** ", values)
+// 	value1 := map[string]interface{}{}
+// 	value1["field"] = "SO2"
+// 	value1["amount"] = 6.7
+// 	fmt.Println("****** ", values)
+// 	values = append(values, value1)
+// 	fmt.Println("******** ", values)
 
-	timestamp := int(time.Now().Unix())
-	timestamp *= 1000 // Convert to milliseconds
-	timestampStr := strconv.Itoa(timestamp)
-	msts := timestamps.MillisecondTimestamp{}
-	datetime := msts.ConvertUTCZ(timestampStr)
+// 	timestamp := int(time.Now().Unix())
+// 	timestamp *= 1000 // Convert to milliseconds
+// 	timestampStr := strconv.Itoa(timestamp)
+// 	msts := timestamps.MillisecondTimestamp{}
+// 	datetime := msts.ConvertUTCZ(timestampStr)
 
-	message := map[string]interface{}{}
-	message["values"] = values
-	message["datetime"] = datetime
-	message["messageId"] = uuid.New().String()
-	fmt.Println(message)
+// 	message := map[string]interface{}{}
+// 	message["values"] = values
+// 	message["datetime"] = datetime
+// 	message["messageId"] = uuid.New().String()
+// 	fmt.Println(message)
 
-	output := map[string]interface{}{}
-	output["data"] = message
-	output["entity"] = "/A/B/C"
+// 	output := map[string]interface{}{}
+// 	output["data"] = message
+// 	output["entity"] = "/A/B/C"
 
-	fmt.Println(output)
-	//act.Eval(output)
-	fmt.Println(act)
+// 	fmt.Println(output)
+// 	//act.Eval(output)
+// 	fmt.Println(act)
 
-	a := func() {
-		fmt.Println("---------------------###############")
-		values := []map[string]interface{}{}
-		value := make(map[string]interface{})
-		value["field"] = "NO2"
-		value["amount"] = rand.Float64() * 10
-		values = append(values, value)
-		//fmt.Println("****** ", values)
-		value1 := map[string]interface{}{}
-		value1["field"] = "SO2"
-		value1["amount"] = rand.Float64() * 10
-		//fmt.Println("****** ", values)
-		values = append(values, value1)
-		//fmt.Println("******** ", values)
-		timestamp := int(time.Now().Unix())
-		timestamp *= 1000 // Convert to milliseconds
-		timestampStr := strconv.Itoa(timestamp)
-		msts := timestamps.MillisecondTimestamp{}
-		datetime := msts.ConvertUTCZ(timestampStr)
+// 	a := func() {
+// 		fmt.Println("---------------------###############")
+// 		values := []map[string]interface{}{}
+// 		value := make(map[string]interface{})
+// 		value["field"] = "NO2"
+// 		value["amount"] = rand.Float64() * 10
+// 		values = append(values, value)
+// 		//fmt.Println("****** ", values)
+// 		value1 := map[string]interface{}{}
+// 		value1["field"] = "SO2"
+// 		value1["amount"] = rand.Float64() * 10
+// 		//fmt.Println("****** ", values)
+// 		values = append(values, value1)
+// 		//fmt.Println("******** ", values)
+// 		timestamp := int(time.Now().Unix())
+// 		timestamp *= 1000 // Convert to milliseconds
+// 		timestampStr := strconv.Itoa(timestamp)
+// 		msts := timestamps.MillisecondTimestamp{}
+// 		datetime := msts.ConvertUTCZ(timestampStr)
 
-		message := map[string]interface{}{}
-		message["values"] = values
-		message["datetime"] = datetime
-		message["messageId"] = uuid.New().String()
+// 		message := map[string]interface{}{}
+// 		message["values"] = values
+// 		message["datetime"] = datetime
+// 		message["messageId"] = uuid.New().String()
 
-		output := map[string]interface{}{}
-		output["data"] = message
-		output["entity"] = "/A/B/C"
+// 		output := map[string]interface{}{}
+// 		output["data"] = message
+// 		output["entity"] = "/A/B/C"
 
-		//fmt.Println("output:\n", output)
-		act.Eval(output)
-	}
-	for j := 0; j < 2; j++ {
-		d := NextMinuteMark(10) + time.Duration(2)*time.Minute
-		time.Sleep(d)
-		a()
-	}
-	for j := 0; j < 2; j++ {
-		d := NextMinuteMark(10) + time.Duration(2)*time.Minute
-		time.Sleep(d)
+// 		//fmt.Println("output:\n", output)
+// 		act.Eval(output)
+// 	}
+// 	for j := 0; j < 2; j++ {
+// 		d := NextMinuteMark(10) + time.Duration(2)*time.Minute
+// 		time.Sleep(d)
+// 		a()
+// 	}
+// 	for j := 0; j < 2; j++ {
+// 		d := NextMinuteMark(10) + time.Duration(2)*time.Minute
+// 		time.Sleep(d)
 
-		a()
+// 		a()
 
-	}
-	for j := 0; j < 6; j++ {
-		d := NextMinuteMark(10) + time.Duration(2)*time.Minute
-		time.Sleep(d)
-		a()
-	}
+// 	}
+// 	for j := 0; j < 6; j++ {
+// 		d := NextMinuteMark(10) + time.Duration(2)*time.Minute
+// 		time.Sleep(d)
+// 		a()
+// 	}
 
-}
+// }
