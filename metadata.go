@@ -17,6 +17,7 @@ type Input struct {
 
 // Output for the package
 type Output struct {
+	ConnectorMsg map[string]interface{} `md:"connectorMsg"`
 }
 
 // ToMap converts from structure to a map
@@ -40,10 +41,20 @@ func (i *Input) FromMap(values map[string]interface{}) error {
 
 // ToMap converts from structure to a map
 func (o *Output) ToMap() map[string]interface{} {
-	return map[string]interface{}{}
+	return map[string]interface{}{
+		"connectorMsg": o.ConnectorMsg,
+	}
 }
 
 // FromMap converts from map to whatever type .
 func (o *Output) FromMap(values map[string]interface{}) error {
+	var err error
+
+	// Converts to string
+	o.ConnectorMsg, err = coerce.ToObject(values["connectorMsg"])
+
+	if err != nil {
+		return err
+	}
 	return nil
 }

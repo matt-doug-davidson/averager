@@ -203,6 +203,11 @@ func (a *Activity) Eval(ConnectorMsg map[string]interface{}) (done bool, err err
 	datetime := ""
 	reportValues := []map[string]interface{}{}
 	fmt.Println("\n", a, "\n")
+	fmt.Println("rcvdTs     ", timestamps.TimestampToLocalTimestring(rcvdTs))
+	fmt.Println("Min Margin ", timestamps.TimestampToLocalTimestring(a.TargetTimestamp-a.Margins))
+	fmt.Println("Mid Margin ", timestamps.TimestampToLocalTimestring(a.TargetTimestamp))
+	fmt.Println("Max Margin ", timestamps.TimestampToLocalTimestring(a.TargetTimestamp+a.Margins))
+
 	if rcvdTs > a.TargetTimestamp-a.Margins && rcvdTs < a.TargetTimestamp+a.Margins {
 		fmt.Println("===== On time ====-")
 		datetime = payload["datetime"].(string)
@@ -311,6 +316,7 @@ func (a *Activity) getNextTargetTimestamp() int64 {
 		}
 	}
 	fmt.Println("%%%%%%%%\n", ts, "\n%%%%%%%")
+	ts += timestamps.Nanoseconds(float64(a.InputOffset) * 60) // InputOffset is seconds. Convert to minutes
 	return ts
 }
 
@@ -359,8 +365,9 @@ func New(ctx activity.InitContext) (Activity, error) {
 
 	s := &Settings{}
 	/* Debug */
-	s.OutputInterval = "4m"
-	s.InputInterval = 1
+	s.OutputInterval = "1H"
+	s.InputInterval = 10
+	s.InputOffset = 2
 	Mappings := map[string]interface{}{}
 	s.Mappings = mapping_json
 	/* Debug */
@@ -424,7 +431,7 @@ func New(ctx activity.InitContext) (Activity, error) {
 	fmt.Println(&act)
 	fmt.Println(act.TargetTimestamp)
 
-	fmt.Println("-------------")
+	fmt.Println("------ TargetTimestamp-------")
 	fmt.Println(timestamps.TimestampToLocalTimestring(act.TargetTimestamp))
 	fmt.Println("-------------")
 
@@ -505,16 +512,19 @@ func main() {
 		act.Eval(output)
 	}
 	for j := 0; j < 2; j++ {
-		d := NextMinuteMark(1)
+		d := NextMinuteMark(10) + time.Duration(2)*time.Minute
 		time.Sleep(d)
 		a()
 	}
-	for j := 0; j < 5; j++ {
-		d := NextMinuteMark(1)
+	for j := 0; j < 2; j++ {
+		d := NextMinuteMark(10) + time.Duration(2)*time.Minute
 		time.Sleep(d)
+
+		a()
+
 	}
-	for j := 0; j < 5; j++ {
-		d := NextMinuteMark(1)
+	for j := 0; j < 6; j++ {
+		d := NextMinuteMark(10) + time.Duration(2)*time.Minute
 		time.Sleep(d)
 		a()
 	}

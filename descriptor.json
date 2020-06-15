@@ -1,0 +1,48 @@
+{
+   "name": "flogo-averager",
+   "type": "flogo:activity",
+   "version": "0.0.1",
+   "title": "Averager",
+   "description": "Averages samples over an interval",
+   "homepage": "https://github.com/matt-doug-davidson/averager",
+   "settings":[
+     {
+       "name": "mappings",
+       "type": "string",
+       "required": true,
+       "description": "The mapping between input and output sensor field names"
+     },
+     {
+       "name": "outputInterval",
+       "type": "string",
+       "required": true,
+       "description": "Any of a set of standard ouputs, 1D, 1H, R8H, #m"
+     },
+     {
+       "name": "inputInterval",
+       "type": "int",
+       "required": true,
+       "description": "The input interval between reports in minute marks"
+     },
+     {
+       "name": "inputOffset",
+       "type": "int",
+       "required": true,
+       "description": "The offset from the minute marks that the input is expected"
+     }
+   ],
+   "input": [
+      {
+        "name": "connectorMsg",
+        "type": "object",
+        "description": "The message for connectorMsg object"
+      }
+   ],
+   "output": [
+     {
+       "name": "connectorMsg",
+       "type": "object",
+       "description": "The message for connectorMsg object"
+     }
+   ]
+ }
