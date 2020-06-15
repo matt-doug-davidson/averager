@@ -282,6 +282,7 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) { /* Standa
 			}
 		}
 	}
+	rc := false
 	if len(reportValues) != 0 {
 		// Create a message an put it in the output
 		data := atif.EncodeData(datetime, reportValues)
@@ -295,10 +296,11 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) { /* Standa
 			logger.Error("Failed to set output oject ", err.Error())
 			return false, err
 		}
+		rc = true
 	}
 	fmt.Println("reportValues:\n", reportValues, "\n")
 	fmt.Println(a)
-	return true, nil
+	return rc, nil
 }
 
 func (a *Activity) setNextTargetTimestamp() {
