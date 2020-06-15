@@ -388,11 +388,12 @@ func New(ctx activity.InitContext) (activity.Activity, error) { /* Standalone te
 	/* Debug */
 	fmt.Println("s.Mappings ", s.Mappings)
 	json.Unmarshal([]byte(s.Mappings), &Mappings)
-
+	fmt.Println("Mappings: ", Mappings)
+	maps := Mappings["mapping"].(map[string]interface{})
 	sensors := make(map[string]string)
 	averagers := make(map[string][]float64)
-	fmt.Println(Mappings)
-	for i, v := range Mappings {
+	fmt.Println(maps)
+	for i, v := range maps {
 		fmt.Println("i, v ", i, v)
 		vv := v.(map[string]interface{})
 		fmt.Println("vv ", vv)
