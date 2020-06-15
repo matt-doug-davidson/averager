@@ -157,7 +157,10 @@ func (a *Activity) average(sensor string) float64 {
 }
 
 func (a *Activity) clear(sensor string) {
-	a.Accumulators[sensor] = nil
+	// Do not clear the R8H accumulator
+	if a.OutputInterval != "R8H" {
+		a.Accumulators[sensor] = nil
+	}
 }
 
 func (a *Activity) append(sensor string, amount float64) {
@@ -195,7 +198,7 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) { /* Standa
 	fmt.Println("\n\n\n+++++++++++++++++++++++++++Eval++++++++++++++++++++++++: \n", input.ConnectorMsg)
 	entity := input.ConnectorMsg["entity"].(string)
 	payload := input.ConnectorMsg["data"].(map[string]interface{})
-	fmt.Println("payload\n", payload)
+	//fmt.Println("payload\n", payload)
 	//fmt.Println("datetime\n", payload["datetime"])
 	rcvdTs := timestamps.UTCZToUTCTimestamp(payload["datetime"].(string))
 	// fmt.Println("-------------")
