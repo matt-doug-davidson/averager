@@ -38,6 +38,24 @@ func init() {
 	_ = activity.Register(&Activity{}, New) /* Stand alone test */
 }
 
+func (a *Activity) print() {
+	fmt.Println("Entity            ", a.Entity)
+	fmt.Println("Sensors:")
+	for k := range a.Sensors {
+		fmt.Println("  ", k, "->", a.Sensors[k])
+	}
+	fmt.Println("InputOffset       ", a.InputOffset)
+	fmt.Println("OutputInterval    ", a.OutputInterval)
+	fmt.Println("TargetTimestamp   ", a.TargetTimestamp)
+	fmt.Println("TargetTimestamp   ", timestamps.TimestampToLocalTimestring(a.TargetTimestamp))
+	fmt.Println("AccumulatorLength ", a.AccumulatorLength)
+	fmt.Println("Accumulators:")
+	for k := range a.Sensors {
+		fmt.Println("  ", k, ":", a.Accumulators[k])
+	}
+	fmt.Println("Margins           ", a.Margins)
+}
+
 // Used when the init function is called. The settings, Input and Output
 // structures are optional depends application. These structures are
 // defined in the metadata.go file in this package.
@@ -175,7 +193,11 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 	values := payload["values"].([]map[string]interface{})
 	datetime := ""
 	reportValues := []map[string]interface{}{}
-	fmt.Println("\n", a, "\n")
+	a.print()
+
+	fmt.Println("Rxvd Ts ", timestamps.TimestampToLocalTimestring(rcvdTs))
+	fmt.Println("Lower Margin: ", timestamps.TimestampToLocalTimestring(a.TargetTimestamp-a.Margins))
+	fmt.Println("Upper Margin: ", timestamps.TimestampToLocalTimestring(a.TargetTimestamp+a.Margins))
 
 	if rcvdTs > a.TargetTimestamp-a.Margins && rcvdTs < a.TargetTimestamp+a.Margins {
 		fmt.Println("===== On time ====-")
@@ -242,7 +264,6 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 		}
 	}
 	rc := false
-	fmt.Println(a)
 	if len(reportValues) != 0 {
 		// Create a message an put it in the output
 		data := atif.EncodeData(datetime, reportValues)
@@ -257,6 +278,7 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 		rc = true
 	}
 
+	a.print()
 	return rc, nil
 }
 
