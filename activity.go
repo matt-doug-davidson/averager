@@ -169,8 +169,9 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 	fmt.Println("\n\n\n+++++++++++++++++++++++++++Eval++++++++++++++++++++++++: \n", input.ConnectorMsg)
 	entity := input.ConnectorMsg["entity"].(string)
 	payload := input.ConnectorMsg["data"].(map[string]interface{})
-	rcvdTs := timestamps.UTCZToUTCTimestamp(payload["datetime"].(string))
-
+	//rcvdTs := timestamps.UTCZToUTCTimestamp(payload["datetime"].(string))
+	// Do not use the datetime in the recieved message as it might be when a device read it. Instead
+	rcvdTs := timestamps.UTCTimestamp()
 	values := payload["values"].([]map[string]interface{})
 	datetime := ""
 	reportValues := []map[string]interface{}{}
