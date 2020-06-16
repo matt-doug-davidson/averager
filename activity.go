@@ -14,16 +14,6 @@ import (
 	"github.com/project-flogo/core/data/metadata"
 )
 
-// var mapping_json = `{
-// 	"NO2": {
-// 		"field": "NO2M"
-// 	},
-// 	"SO2": {
-// 		"field": "SO2"
-// 	}
-// }
-// `
-
 type Activity struct {
 	settings          *Settings            // Defind in metadata.go in this package
 	Entity            string               // Value from the Eval message
@@ -45,7 +35,6 @@ func (a *Activity) Metadata() *activity.Metadata {
 // The init function is executed after the package is imported. This function
 // runs before any other in the package.
 func init() {
-	//_ = activity.Register(&Activity{})
 	_ = activity.Register(&Activity{}, New) /* Stand alone test */
 }
 
@@ -97,15 +86,6 @@ func NextDayTimestamp() int64 {
 // mark within the hour. The offset is seconds to delay after the
 // minute mark.
 func NextMinuteMark(interval int64) time.Duration {
-	// // Get current times
-	// seconds := time.Now().Unix()
-	// // Current mark
-	// currentMinute := seconds / 60                             // minutes
-	// minuteOfHour := currentMinute % 60                        // minutes
-	// currentMarkOfHour := (minuteOfHour / interval) * interval // minutes
-	// // Next Mark
-	// nextMarkOfHour := currentMarkOfHour + interval
-	// nextMarkSeconds := currentMinute + nextMarkOfHour - minuteOfHour
 	nextMarkNanoSecs := timestamps.NextMinuteTimestamp(interval)
 	nanoSeconds := time.Now().UnixNano()
 	delayToNextMark := nextMarkNanoSecs - nanoSeconds
@@ -115,8 +95,7 @@ func NextMinuteMark(interval int64) time.Duration {
 
 func (a *Activity) getDelay() time.Duration {
 	var delay time.Duration = time.Duration(60) * time.Second
-	fmt.Println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-	fmt.Println(a.OutputInterval)
+
 	if a.OutputInterval == "1H" {
 		delay = NextHourDelay()
 	} else if a.OutputInterval == "1D" {
@@ -125,8 +104,6 @@ func (a *Activity) getDelay() time.Duration {
 		delay = NextHourDelay()
 	} else {
 		interval := strings.Split(a.OutputInterval, "m")
-		fmt.Println(interval)
-		fmt.Println(len(interval))
 		if interval[1] != "" {
 			fmt.Println("Not in minutes but should be")
 		}
@@ -135,10 +112,8 @@ func (a *Activity) getDelay() time.Duration {
 			fmt.Println("Eror: ", err.Error())
 
 		}
-		fmt.Println(intervalI)
 		delay = NextMinuteMark(intervalI)
 	}
-	fmt.Println(delay)
 	offsetDelay := time.Duration(a.InputOffset) * time.Second
 	delay += offsetDelay
 	return delay
@@ -176,14 +151,11 @@ var percisions map[int]float64 = map[int]float64{0: 0, 1: 10, 2: 100, 3: 1000, 4
 func setPercision(v float64, digits int) float64 {
 	periciseness := percisions[digits]
 	value := math.Round(v*periciseness) / periciseness
-	fmt.Printf("%T\n", value)
-	fmt.Println(value)
 	return value
 }
 
 // Eval evaluates the activity
-func (a *Activity) Eval(ctx activity.Context) (done bool, err error) { /* Standalone Test */
-	//func (a *Activity) Eval(ConnectorMsg map[string]interface{}) (done bool, err error) {
+func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 	logger := ctx.Logger()
 	logger.Info("averager:Eval enter")
 
@@ -193,30 +165,16 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) { /* Standa
 		logger.Error("Failed to input object")
 		return false, err
 	}
-	//fmt.Println(input.ConnectorMsg)
-	//fmt.Println(input.ConnectorMsg["entity"])
+
 	fmt.Println("\n\n\n+++++++++++++++++++++++++++Eval++++++++++++++++++++++++: \n", input.ConnectorMsg)
 	entity := input.ConnectorMsg["entity"].(string)
 	payload := input.ConnectorMsg["data"].(map[string]interface{})
-	//fmt.Println("payload\n", payload)
-	//fmt.Println("datetime\n", payload["datetime"])
 	rcvdTs := timestamps.UTCZToUTCTimestamp(payload["datetime"].(string))
-	// fmt.Println("-------------")
-	// fmt.Println(rcvdTs)
-	// fmt.Println(timestamps.TimestampToLocalTimestring(rcvdTs))
-	// fmt.Println(timestamps.TimestampToLocalTimestring(a.TargetTimestamp))
-	// fmt.Println("-------------")
-	//fmt.Println("values\n", payload["values"])
 
 	values := payload["values"].([]map[string]interface{})
-	//fmt.Println("values\n", values)
 	datetime := ""
 	reportValues := []map[string]interface{}{}
 	fmt.Println("\n", a, "\n")
-	fmt.Println("rcvdTs     ", timestamps.TimestampToLocalTimestring(rcvdTs))
-	fmt.Println("Min Margin ", timestamps.TimestampToLocalTimestring(a.TargetTimestamp-a.Margins))
-	fmt.Println("Mid Margin ", timestamps.TimestampToLocalTimestring(a.TargetTimestamp))
-	fmt.Println("Max Margin ", timestamps.TimestampToLocalTimestring(a.TargetTimestamp+a.Margins))
 
 	if rcvdTs > a.TargetTimestamp-a.Margins && rcvdTs < a.TargetTimestamp+a.Margins {
 		fmt.Println("===== On time ====-")
@@ -230,13 +188,10 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) { /* Standa
 			value := map[string]interface{}{}
 			_, found := a.Accumulators[sensor]
 			if found {
-				fmt.Println("Found::::")
 				a.append(sensor, amount)
-				fmt.Println(a.Accumulators[sensor])
 				if int64(len(a.Accumulators[sensor])) >= a.AccumulatorLength/2 {
 					value["field"] = a.Sensors[sensor]
 					value["amount"] = a.average(sensor)
-					fmt.Println("")
 					reportValues = append(reportValues, value)
 				}
 				a.clear(sensor)
@@ -286,13 +241,12 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) { /* Standa
 		}
 	}
 	rc := false
+	fmt.Println(a)
 	if len(reportValues) != 0 {
 		// Create a message an put it in the output
 		data := atif.EncodeData(datetime, reportValues)
 		output := atif.EncodeOutput(entity, data)
 		fmt.Println(output)
-		// ConnectorMessage := make(map[string]interface{})
-		// ConnectorMessage["msg"] = connectorData
 
 		err = ctx.SetOutput("connectorMsg", output)
 		if err != nil {
@@ -301,15 +255,12 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) { /* Standa
 		}
 		rc = true
 	}
-	fmt.Println("reportValues:\n", reportValues, "\n")
-	fmt.Println(a)
+
 	return rc, nil
 }
 
 func (a *Activity) setNextTargetTimestamp() {
 	a.TargetTimestamp = a.getNextTargetTimestamp()
-	fmt.Println("%%%%%%%%\n", a.TargetTimestamp, "\n%%%%%%%")
-
 }
 
 func (a *Activity) getNextTargetTimestamp() int64 {
@@ -333,9 +284,7 @@ func (a *Activity) getNextTargetTimestamp() int64 {
 }
 
 func (a *Activity) atTimeMark() bool {
-	fmt.Println("-------------------- atTimeMark (strart) ------------------")
 	currentTimestamp := timestamps.UTCTimestamp()
-	fmt.Println(currentTimestamp)
 
 	var tSpan int64
 	if a.OutputInterval == "1H" || a.OutputInterval == "R8H" {
@@ -351,29 +300,20 @@ func (a *Activity) atTimeMark() bool {
 			tSpan = timestamps.Nanoseconds(60 * float64(minutesInt))
 		}
 	}
-	fmt.Println(">>>a.TargetTimestamp ", a.TargetTimestamp)
-	fmt.Println(">>> tSpan ", tSpan)
 	previousTarget := a.TargetTimestamp - tSpan
-	fmt.Println(">>> previousarget ", previousTarget)
 	upperMargin := previousTarget + a.Margins
-	fmt.Println(">>> uppserMargin ", upperMargin)
 	lowerMargin := previousTarget - a.Margins
-	fmt.Println(">>> lowerMargin ", lowerMargin)
 	var rc bool
 	if currentTimestamp > lowerMargin && currentTimestamp < upperMargin {
-		fmt.Println("This is a previous target")
 		rc = true
 	} else {
-		fmt.Println("This is a not previous target")
 		rc = false
 	}
 
-	fmt.Println("-------------------- atTimeMark (end) ------------------")
 	return rc
 }
 
-func New(ctx activity.InitContext) (activity.Activity, error) { /* Standalone test */
-	//func New(ctx activity.InitContext) (Activity, error) {
+func New(ctx activity.InitContext) (activity.Activity, error) {
 
 	logger := ctx.Logger()
 	logger.Info("averager:New enter")
@@ -383,13 +323,9 @@ func New(ctx activity.InitContext) (activity.Activity, error) { /* Standalone te
 		logger.Error("Failed to convert settings")
 		return nil, err
 	}
-	fmt.Println("s ", s)
-	/* Debug */
-	// s.OutputInterval = "1H"
-	// s.InputInterval = 10
-	// s.InputOffset = 2
+
 	Mappings := map[string]interface{}{}
-	// s.Mappings = mapping_json
+
 	/* Debug */
 	fmt.Println("s.Mappings ", s.Mappings)
 	json.Unmarshal([]byte(s.Mappings), &Mappings)
@@ -399,17 +335,14 @@ func New(ctx activity.InitContext) (activity.Activity, error) { /* Standalone te
 	averagers := make(map[string][]float64)
 	fmt.Println(maps)
 	for i, v := range maps {
-		fmt.Println("i, v ", i, v)
 		vv := v.(map[string]interface{})
-		fmt.Println("vv ", vv)
-		f, found := vv["field"]
-		fmt.Println("f, found ", f, found)
+		_, found := vv["field"]
 		if !found {
 			continue
 		}
 		sensors[i] = vv["field"].(string)
 		averagers[i] = make([]float64, 0, 0)
-		fmt.Println(f)
+
 	}
 	/*
 		Create a report time stamp based on mark time. Whenever incomeing timestamp is aboe that report
@@ -435,15 +368,13 @@ func New(ctx activity.InitContext) (activity.Activity, error) { /* Standalone te
 				minutes = minutesInt
 			}
 		}
-		fmt.Println("minutes ", minutes)
+
 		accumLength = (minutes / s.InputInterval) + 1
 	}
 
 	margins := timestamps.Nanoseconds(float64(s.InputInterval) / 2.0)
-	fmt.Println("margins: ", margins)
 
 	act := &Activity{
-		/* act := Activity{ Standalone Test */
 		Sensors:           sensors,
 		Accumulators:      averagers,
 		AccumulatorLength: accumLength,
@@ -452,105 +383,6 @@ func New(ctx activity.InitContext) (activity.Activity, error) { /* Standalone te
 		Margins:           margins,
 		Entity:            ""}
 	act.setNextTargetTimestamp()
-	fmt.Println(&act)
-	fmt.Println(act.TargetTimestamp)
-
-	fmt.Println("------ TargetTimestamp-------")
-	fmt.Println(timestamps.TimestampToLocalTimestring(act.TargetTimestamp))
-	fmt.Println("-------------")
 
 	return act, nil
 }
-
-// func main() {
-// 	fmt.Println("Starting")
-
-// 	iCtx := test.NewActivityInitContext(nil, nil)
-// 	act, _ := New(iCtx)
-
-// 	fmt.Println(act)
-
-// 	values := []map[string]interface{}{}
-// 	value := make(map[string]interface{})
-// 	value["field"] = "NO2"
-// 	value["amount"] = 5.0
-// 	values = append(values, value)
-// 	fmt.Println("****** ", values)
-// 	value1 := map[string]interface{}{}
-// 	value1["field"] = "SO2"
-// 	value1["amount"] = 6.7
-// 	fmt.Println("****** ", values)
-// 	values = append(values, value1)
-// 	fmt.Println("******** ", values)
-
-// 	timestamp := int(time.Now().Unix())
-// 	timestamp *= 1000 // Convert to milliseconds
-// 	timestampStr := strconv.Itoa(timestamp)
-// 	msts := timestamps.MillisecondTimestamp{}
-// 	datetime := msts.ConvertUTCZ(timestampStr)
-
-// 	message := map[string]interface{}{}
-// 	message["values"] = values
-// 	message["datetime"] = datetime
-// 	message["messageId"] = uuid.New().String()
-// 	fmt.Println(message)
-
-// 	output := map[string]interface{}{}
-// 	output["data"] = message
-// 	output["entity"] = "/A/B/C"
-
-// 	fmt.Println(output)
-// 	//act.Eval(output)
-// 	fmt.Println(act)
-
-// 	a := func() {
-// 		fmt.Println("---------------------###############")
-// 		values := []map[string]interface{}{}
-// 		value := make(map[string]interface{})
-// 		value["field"] = "NO2"
-// 		value["amount"] = rand.Float64() * 10
-// 		values = append(values, value)
-// 		//fmt.Println("****** ", values)
-// 		value1 := map[string]interface{}{}
-// 		value1["field"] = "SO2"
-// 		value1["amount"] = rand.Float64() * 10
-// 		//fmt.Println("****** ", values)
-// 		values = append(values, value1)
-// 		//fmt.Println("******** ", values)
-// 		timestamp := int(time.Now().Unix())
-// 		timestamp *= 1000 // Convert to milliseconds
-// 		timestampStr := strconv.Itoa(timestamp)
-// 		msts := timestamps.MillisecondTimestamp{}
-// 		datetime := msts.ConvertUTCZ(timestampStr)
-
-// 		message := map[string]interface{}{}
-// 		message["values"] = values
-// 		message["datetime"] = datetime
-// 		message["messageId"] = uuid.New().String()
-
-// 		output := map[string]interface{}{}
-// 		output["data"] = message
-// 		output["entity"] = "/A/B/C"
-
-// 		//fmt.Println("output:\n", output)
-// 		act.Eval(output)
-// 	}
-// 	for j := 0; j < 2; j++ {
-// 		d := NextMinuteMark(10) + time.Duration(2)*time.Minute
-// 		time.Sleep(d)
-// 		a()
-// 	}
-// 	for j := 0; j < 2; j++ {
-// 		d := NextMinuteMark(10) + time.Duration(2)*time.Minute
-// 		time.Sleep(d)
-
-// 		a()
-
-// 	}
-// 	for j := 0; j < 6; j++ {
-// 		d := NextMinuteMark(10) + time.Duration(2)*time.Minute
-// 		time.Sleep(d)
-// 		a()
-// 	}
-
-// }
