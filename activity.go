@@ -349,6 +349,7 @@ func New(ctx activity.InitContext) (activity.Activity, error) {
 
 	Mappings := map[string]interface{}{}
 
+	fmt.Println(s.Debug)
 	/* Debug */
 	fmt.Println("s.Mappings ", s.Mappings)
 	json.Unmarshal([]byte(s.Mappings), &Mappings)

@@ -8,6 +8,7 @@ type Settings struct {
 	OutputInterval string `md:"outputInterval,required"`
 	InputInterval  int64  `md:"inputInterval,required"`
 	InputOffset    int64  `md:"inputOffset,required"`
+	Debug          bool   `md:"debug"`
 }
 
 // Input for the package

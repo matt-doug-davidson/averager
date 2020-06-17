@@ -29,6 +29,13 @@
        "type": "int",
        "required": true,
        "description": "The offset from the minute marks that the input is expected"
+     },
+     {
+       "name": "debug",
+       "type": "boolean",
+       "required": false,
+       "value": false,
+       "description": "Debug flag"
      }
    ],
    "input": [
