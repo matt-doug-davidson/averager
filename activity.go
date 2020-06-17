@@ -12,10 +12,12 @@ import (
 	"github.com/matt-doug-davidson/timestamps"
 	"github.com/project-flogo/core/activity"
 	"github.com/project-flogo/core/data/metadata"
+	"github.com/project-flogo/core/support/log"
 )
 
 type Activity struct {
-	settings          *Settings            // Defind in metadata.go in this package
+	settings          *Settings // Defind in metadata.go in this package
+	logger            log.Logger
 	Entity            string               // Value from the Eval message
 	Sensors           map[string]string    // key: sensor string value: field
 	InputOffset       int64                // Seconds
@@ -24,6 +26,7 @@ type Activity struct {
 	AccumulatorLength int64                // key: sensor string value: accumulator length
 	TargetTimestamp   int64
 	Margins           int64 // Nanoseconds
+	Debug             bool
 }
 
 // Metadata returns the activity's metadata
@@ -38,22 +41,25 @@ func init() {
 	_ = activity.Register(&Activity{}, New) /* Stand alone test */
 }
 
-func (a *Activity) print() {
-	fmt.Println("Entity            ", a.Entity)
-	fmt.Println("Sensors:")
-	for k := range a.Sensors {
-		fmt.Println("  ", k, "->", a.Sensors[k])
+func (a *Activity) log() {
+	if a.Debug {
+		a.logger.Info("Entity            ", a.Entity)
+		a.logger.Info("Sensors:")
+		for k := range a.Sensors {
+			a.logger.Info("  ", k, "->", a.Sensors[k])
+		}
+		a.logger.Info("InputOffset       ", a.InputOffset)
+		a.logger.Info("OutputInterval    ", a.OutputInterval)
+		a.logger.Info("TargetTimestamp   ", a.TargetTimestamp)
+		a.logger.Info("TargetTimestamp   ", timestamps.TimestampToLocalTimestring(a.TargetTimestamp))
+		a.logger.Info("AccumulatorLength ", a.AccumulatorLength)
+		a.logger.Info("Accumulators:")
+		for k := range a.Sensors {
+			a.logger.Info("  ", k, ":", a.Accumulators[k])
+		}
+		a.logger.Info("Margins           ", a.Margins)
+		a.logger.Info("Debug             ", a.Debug)
 	}
-	fmt.Println("InputOffset       ", a.InputOffset)
-	fmt.Println("OutputInterval    ", a.OutputInterval)
-	fmt.Println("TargetTimestamp   ", a.TargetTimestamp)
-	fmt.Println("TargetTimestamp   ", timestamps.TimestampToLocalTimestring(a.TargetTimestamp))
-	fmt.Println("AccumulatorLength ", a.AccumulatorLength)
-	fmt.Println("Accumulators:")
-	for k := range a.Sensors {
-		fmt.Println("  ", k, ":", a.Accumulators[k])
-	}
-	fmt.Println("Margins           ", a.Margins)
 }
 
 // Used when the init function is called. The settings, Input and Output
@@ -174,17 +180,18 @@ func setPercision(v float64, digits int) float64 {
 
 // Eval evaluates the activity
 func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
-	logger := ctx.Logger()
-	logger.Info("averager:Eval enter")
+	a.logger.Info("averager:Eval enter")
 
 	input := &Input{}
 	err = ctx.GetInputObject(input)
 	if err != nil {
-		logger.Error("Failed to input object")
+		a.logger.Error("Failed to input object")
 		return false, err
 	}
 
-	fmt.Println("\n\n\n+++++++++++++++++++++++++++Eval++++++++++++++++++++++++: \n", input.ConnectorMsg)
+	if a.Debug {
+		a.logger.Info("\n\n\n+++++++++++++++++++++++++++Eval++++++++++++++++++++++++: \n", input.ConnectorMsg)
+	}
 	entity := input.ConnectorMsg["entity"].(string)
 	payload := input.ConnectorMsg["data"].(map[string]interface{})
 	//rcvdTs := timestamps.UTCZToUTCTimestamp(payload["datetime"].(string))
@@ -193,14 +200,17 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 	values := payload["values"].([]map[string]interface{})
 	datetime := ""
 	reportValues := []map[string]interface{}{}
-	a.print()
+	a.log()
 
-	fmt.Println("Rxvd Ts ", timestamps.TimestampToLocalTimestring(rcvdTs))
-	fmt.Println("Lower Margin: ", timestamps.TimestampToLocalTimestring(a.TargetTimestamp-a.Margins))
-	fmt.Println("Upper Margin: ", timestamps.TimestampToLocalTimestring(a.TargetTimestamp+a.Margins))
-
+	if a.Debug {
+		fmt.Println("Rxvd Ts ", timestamps.TimestampToLocalTimestring(rcvdTs))
+		fmt.Println("Lower Margin: ", timestamps.TimestampToLocalTimestring(a.TargetTimestamp-a.Margins))
+		fmt.Println("Upper Margin: ", timestamps.TimestampToLocalTimestring(a.TargetTimestamp+a.Margins))
+	}
 	if rcvdTs > a.TargetTimestamp-a.Margins && rcvdTs < a.TargetTimestamp+a.Margins {
-		fmt.Println("===== On time ====-")
+		if a.Debug {
+			fmt.Println("===== On time ====-")
+		}
 		datetime = payload["datetime"].(string)
 		// Append new value, average store average, clear accumulator
 		// Note: it would be slightly faster to loop over the sensors being monitored and check
@@ -222,7 +232,9 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 		}
 		a.setNextTargetTimestamp()
 	} else if rcvdTs >= a.TargetTimestamp+a.Margins {
-		fmt.Println("===== Late ====")
+		if a.Debug {
+			fmt.Println("===== Late ====")
+		}
 		// Need process the missed time
 		// Average existing values
 		// Report with target timestamps
@@ -252,7 +264,9 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 		}
 	} else if rcvdTs <= a.TargetTimestamp+a.Margins {
 		// Do not adjust the next target timestamp at this point.
-		fmt.Println("OK - Process accumulation")
+		if a.Debug {
+			fmt.Println("===== Accumulate ====")
+		}
 		// Append
 		for _, v := range values {
 			sensor := v["field"].(string)
@@ -272,13 +286,13 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 
 		err = ctx.SetOutput("connectorMsg", output)
 		if err != nil {
-			logger.Error("Failed to set output oject ", err.Error())
+			a.logger.Error("Failed to set output oject ", err.Error())
 			return false, err
 		}
 		rc = true
 	}
 
-	a.print()
+	a.log()
 	return rc, nil
 }
 
@@ -405,8 +419,11 @@ func New(ctx activity.InitContext) (activity.Activity, error) {
 		InputOffset:       s.InputOffset,
 		OutputInterval:    s.OutputInterval,
 		Margins:           margins,
-		Entity:            ""}
+		Entity:            "",
+		logger:            logger,
+		Debug:             s.Debug}
 	act.setNextTargetTimestamp()
+	fmt.Println("act.Debug ", act.Debug)
 
 	return act, nil
 }
