@@ -2,7 +2,6 @@ package averager
 
 import (
 	"encoding/json"
-	"fmt"
 	"math"
 	"strconv"
 	"strings"
@@ -129,12 +128,11 @@ func (a *Activity) getDelay() time.Duration {
 	} else {
 		interval := strings.Split(a.OutputInterval, "m")
 		if interval[1] != "" {
-			fmt.Println("Not in minutes but should be")
+			a.logger.Error("Not in minutes but should be")
 		}
 		intervalI, err := strconv.ParseInt(interval[0], 10, 64)
 		if err != nil {
-			fmt.Println("Eror: ", err.Error())
-
+			a.logger.Error("Eror: ", err.Error())
 		}
 		delay = NextMinuteMark(intervalI)
 	}
@@ -203,13 +201,13 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 	a.log()
 
 	if a.Debug {
-		fmt.Println("Rxvd Ts ", timestamps.TimestampToLocalTimestring(rcvdTs))
-		fmt.Println("Lower Margin: ", timestamps.TimestampToLocalTimestring(a.TargetTimestamp-a.Margins))
-		fmt.Println("Upper Margin: ", timestamps.TimestampToLocalTimestring(a.TargetTimestamp+a.Margins))
+		a.logger.Info("Rxvd Ts ", timestamps.TimestampToLocalTimestring(rcvdTs))
+		a.logger.Info("Lower Margin: ", timestamps.TimestampToLocalTimestring(a.TargetTimestamp-a.Margins))
+		a.logger.Info("Upper Margin: ", timestamps.TimestampToLocalTimestring(a.TargetTimestamp+a.Margins))
 	}
 	if rcvdTs > a.TargetTimestamp-a.Margins && rcvdTs < a.TargetTimestamp+a.Margins {
 		if a.Debug {
-			fmt.Println("===== On time ====-")
+			a.logger.Info("===== On time ====-")
 		}
 		datetime = payload["datetime"].(string)
 		// Append new value, average store average, clear accumulator
@@ -233,7 +231,7 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 		a.setNextTargetTimestamp()
 	} else if rcvdTs >= a.TargetTimestamp+a.Margins {
 		if a.Debug {
-			fmt.Println("===== Late ====")
+			a.logger.Info("===== Late ====")
 		}
 		// Need process the missed time
 		// Average existing values
@@ -265,7 +263,7 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 	} else if rcvdTs <= a.TargetTimestamp+a.Margins {
 		// Do not adjust the next target timestamp at this point.
 		if a.Debug {
-			fmt.Println("===== Accumulate ====")
+			a.logger.Info("===== Accumulate ====")
 		}
 		// Append
 		for _, v := range values {
@@ -282,7 +280,9 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 		// Create a message an put it in the output
 		data := atif.EncodeData(datetime, reportValues)
 		output := atif.EncodeOutput(entity, data)
-		fmt.Println(output)
+		if a.Debug {
+			a.logger.Info(output)
+		}
 
 		err = ctx.SetOutput("connectorMsg", output)
 		if err != nil {
@@ -293,6 +293,7 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 	}
 
 	a.log()
+	a.logger.Info("averager:Eval enter")
 	return rc, nil
 }
 
@@ -315,7 +316,6 @@ func (a *Activity) getNextTargetTimestamp() int64 {
 			ts = timestamps.NextMinuteTimestamp(minutesInt)
 		}
 	}
-	fmt.Println("%%%%%%%%\n", ts, "\n%%%%%%%")
 	ts += timestamps.Nanoseconds(float64(a.InputOffset) * 60) // InputOffset is seconds. Convert to minutes
 	return ts
 }
@@ -363,15 +363,11 @@ func New(ctx activity.InitContext) (activity.Activity, error) {
 
 	Mappings := map[string]interface{}{}
 
-	fmt.Println(s.Debug)
 	/* Debug */
-	fmt.Println("s.Mappings ", s.Mappings)
 	json.Unmarshal([]byte(s.Mappings), &Mappings)
-	fmt.Println("Mappings: ", Mappings)
 	maps := Mappings["mapping"].(map[string]interface{})
 	sensors := make(map[string]string)
 	averagers := make(map[string][]float64)
-	fmt.Println(maps)
 	for i, v := range maps {
 		vv := v.(map[string]interface{})
 		_, found := vv["field"]
@@ -423,7 +419,6 @@ func New(ctx activity.InitContext) (activity.Activity, error) {
 		logger:            logger,
 		Debug:             s.Debug}
 	act.setNextTargetTimestamp()
-	fmt.Println("act.Debug ", act.Debug)
 
 	return act, nil
 }
